@@ -12,6 +12,8 @@ Janela nativa do Windows para o [DeepSeek Harness](https://github.com/deepseek-a
 
 Escolhe idioma (English / Português), mostra cada etapa com progresso e instala o atalho no Desktop.
 
+> Os binários não têm assinatura digital. Se o SmartScreen ou o antivírus reclamar, é falso positivo — veja [Falsos positivos de antivírus](#falsos-positivos-de-antivírus) e o código-fonte completo no repositório.
+
 **Ou por linha de comando:**
 
 ```powershell
@@ -50,6 +52,30 @@ O desinstalador tem só três itens: **DeepSeek Harness** (marcado por padrão) 
 - Porta `3080` ocupada → sobe em porta livre automaticamente.
 - Job Object `KILL_ON_JOB_CLOSE`: fecha a janela e o processo `node` do dsh morre junto.
 - Argumentos extras são repassados: `DeepSeek Harness.exe --port 8080`.
+
+## Falsos positivos de antivírus
+
+Os três executáveis (app, setup e desinstalador) **não são assinados digitalmente**. O projeto não possui certificado de _code signing_, então o Windows SmartScreen pode exibir "editor desconhecido" e alguns antivírus podem classificar os arquivos como suspeitos. Isso é esperado para binários novos e sem assinatura e não indica comprometimento.
+
+O código-fonte completo está neste repositório, sem ofuscação, sem empacotamento e sem componente fechado. O comportamento que costuma chamar a atenção de um scanner é o esperado de um instalador:
+
+- baixa arquivos do GitHub (Node.js e o próprio app);
+- executa `npm` e `winget` em segundo plano, com a janela de console oculta;
+- cria atalhos no Desktop/Menu Iniciar e uma entrada no registro do Windows;
+- abre uma janela WebView2 e acessa `opencode.ai/inference/v1`.
+
+Para verificar por conta própria:
+
+1. Clone o repositório e compile com os comandos da seção abaixo.
+2. Compare o SHA-256 do binário gerado com o do asset publicado:
+
+```powershell
+Get-FileHash ".\DeepSeek Harness.exe" -Algorithm SHA256
+```
+
+3. Se preferir, rode o app direto do código, sem baixar executável nenhum.
+
+Cada release é gerado a partir do commit da tag correspondente, e todo o histórico de alterações fica visível no repositório.
 
 ## Build a partir do fonte
 
