@@ -27,6 +27,8 @@ const (
 	appName         = "DeepSeek Harness"
 	exeName         = "DeepSeek Harness.exe"
 	uninstallerName = "DeepSeek-Harness-Uninstall.exe"
+	bridgePkg       = "dsh-opencode-bridge@0.5.2"
+	profileName     = "web"
 )
 
 var (
@@ -195,6 +197,38 @@ func ensureDsh() (string, string, error) {
 	return "ok", "installed:", nil
 }
 
+func profileManifest() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".dsh", "profiles", profileName, "package.json")
+}
+
+func bridgeInstalled() bool {
+	data, err := os.ReadFile(profileManifest())
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), "dsh-opencode-bridge")
+}
+
+// ensureBridge installs the DSH plugin that exposes the free OpenCode models.
+// Without it the opencode-bridge provider does not exist, so the app has no model.
+func ensureBridge() (string, string, error) {
+	if bridgeInstalled() {
+		return "ok", "present:", nil
+	}
+	step("bridge", "run", "")
+	if _, err := runHidden("cmd.exe", "/c", "dsh", "plugin", "--profile", profileName, "add", bridgePkg); err != nil {
+		return "fail", "", err
+	}
+	if !bridgeInstalled() {
+		return "fail", "", fmt.Errorf("bridge not in profile after install")
+	}
+	return "ok", "installed:", nil
+}
+
 func ensureOpencode(want bool) (string, string, error) {
 	if has("opencode") {
 		return "ok", "present:", nil
@@ -282,7 +316,7 @@ foreach ($where in @(%s, %s)) {
 $key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\DeepSeekHarness'
 New-Item -Path $key -Force | Out-Null
 Set-ItemProperty -Path $key -Name DisplayName -Value 'DeepSeek Harness'
-Set-ItemProperty -Path $key -Name DisplayVersion -Value '1.3.1'
+Set-ItemProperty -Path $key -Name DisplayVersion -Value '1.4.0'
 Set-ItemProperty -Path $key -Name Publisher -Value 'Ryanabcraft'
 Set-ItemProperty -Path $key -Name DisplayIcon -Value $target
 Set-ItemProperty -Path $key -Name InstallLocation -Value $dir
@@ -341,6 +375,14 @@ func installAll(optsJSON string) {
 		return
 	} else {
 		step("dsh", state, detail)
+	}
+
+	if state, detail, err := ensureBridge(); err != nil {
+		step("bridge", "fail", err.Error())
+		emit("window.fail(" + jsonStr("bridge") + ")")
+		return
+	} else {
+		step("bridge", state, detail)
 	}
 
 	if state, detail, err := ensureOpencode(opts.Opencode); err != nil {

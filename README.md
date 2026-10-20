@@ -1,4 +1,4 @@
-# DeepSeek Harness PC
+﻿# DeepSeek Harness PC
 
 Janela nativa do Windows para o [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) — sem browser, sem barra de endereço, com ícone próprio e modelos free do OpenCode.
 
@@ -24,8 +24,9 @@ O instalador faz, em ordem, e **pula o que já existe**:
 
 1. **Node.js LTS** — se não houver `node`, instala via winget.
 2. **DSH** — se não houver `dsh`, roda `npm i -g @deepseek-ai/dsh`.
-3. **OpenCode CLI** — opcional, pergunta antes. O bridge de modelos free **não precisa** dele; fala direto com `opencode.ai/inference/v1`.
-4. **App** — baixa o `DeepSeek-Harness.exe` do último release, instala em `%LOCALAPPDATA%\Programs\DeepSeekHarness` e cria atalho no Desktop.
+3. **OpenCode bridge** — instala o plugin `dsh-opencode-bridge@0.5.2` no perfil `web` (é ele que fornece os modelos free; sem isso o provider `opencode-bridge` não existe).
+4. **OpenCode CLI** — opcional, pergunta antes. O bridge **não precisa** dele; fala direto com `opencode.ai/inference/v1`.
+5. **App** — baixa o `DeepSeek-Harness.exe` do último release, instala em `%LOCALAPPDATA%\Programs\DeepSeekHarness` e cria atalho no Desktop.
 
 Flags: `-Yes` (não pergunta nada, instala o OpenCode) e `-NoShortcut`.
 

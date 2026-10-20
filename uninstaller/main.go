@@ -109,9 +109,22 @@ func has(cmd string) bool {
 type state struct {
 	App      bool `json:"app"`
 	Dsh      bool `json:"dsh"`
+	Bridge   bool `json:"bridge"`
 	Opencode bool `json:"opencode"`
 	Node     bool `json:"node"`
 	Data     bool `json:"data"`
+}
+
+func bridgeInstalled() bool {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".dsh", "profiles", "web", "package.json"))
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(data), "dsh-opencode-bridge")
 }
 
 func appDirs() []string {
@@ -137,6 +150,7 @@ func scan() string {
 	s := state{
 		App:      len(installedDirs()) > 0,
 		Dsh:      has("dsh"),
+		Bridge:   bridgeInstalled(),
 		Opencode: has("opencode"),
 		Node:     has("node"),
 		Data:     false,
@@ -220,6 +234,16 @@ func uninstallAll(selJSON string) {
 	var sel state
 	_ = json.Unmarshal([]byte(selJSON), &sel)
 
+	if sel.Bridge {
+		emit(`window.step('bridge','run')`)
+		if !has("dsh") {
+			emit(`window.step('bridge','ok')`)
+		} else if _, err := runHidden("cmd.exe", "/c", "dsh", "plugin", "--profile", "web", "remove", "dsh-opencode-bridge"); err != nil {
+			emit(`window.step('bridge','fail',` + jsonStr(err.Error()) + `)`)
+		} else {
+			emit(`window.step('bridge','ok')`)
+		}
+	}
 	if sel.Dsh {
 		emit(`window.step('dsh','run')`)
 		if err := npmUninstall("@deepseek-ai/dsh"); err != nil {

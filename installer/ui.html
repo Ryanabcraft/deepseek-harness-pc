@@ -117,6 +117,7 @@
     <div class="sub" id="t-sub"></div>
     <div class="row" id="r-node"><div class="dot"></div><div class="label" id="l-node"></div><div class="hint" id="h-node"></div></div>
     <div class="row" id="r-dsh"><div class="dot"></div><div class="label" id="l-dsh"></div><div class="hint" id="h-dsh"></div></div>
+    <div class="row" id="r-bridge"><div class="dot"></div><div class="label" id="l-bridge"></div><div class="hint" id="h-bridge"></div></div>
     <div class="row" id="r-opencode"><div class="dot"></div><div class="label" id="l-opencode"></div><div class="hint" id="h-opencode"></div></div>
     <div class="row" id="r-app"><div class="dot"></div><div class="label" id="l-app"></div><div class="hint" id="h-app"></div></div>
     <div class="toggle"><input type="checkbox" id="opt-opencode" checked><label for="opt-opencode" id="l-opt"></label></div>
@@ -132,6 +133,7 @@
     <div class="sub" id="st-run"></div>
     <div class="row" id="p-node"><div class="dot"></div><div class="label" id="pl-node"></div><div class="hint" id="ph-node"></div></div>
     <div class="row" id="p-dsh"><div class="dot"></div><div class="label" id="pl-dsh"></div><div class="hint" id="ph-dsh"></div></div>
+    <div class="row" id="p-bridge"><div class="dot"></div><div class="label" id="pl-bridge"></div><div class="hint" id="ph-bridge"></div></div>
     <div class="row" id="p-opencode"><div class="dot"></div><div class="label" id="pl-opencode"></div><div class="hint" id="ph-opencode"></div></div>
     <div class="row" id="p-app"><div class="dot"></div><div class="label" id="pl-app"></div><div class="hint" id="ph-app"></div></div>
     <div class="bar"><i id="bar"></i></div>
@@ -156,7 +158,7 @@ const T = {
   en: {
     title: "Set up DeepSeek Harness",
     sub: "Native window, free OpenCode models, no browser. The installer skips whatever is already on your PC.",
-    node: "Node.js", dsh: "DeepSeek Harness (dsh)", opencode: "OpenCode CLI",
+    node: "Node.js", dsh: "DeepSeek Harness (dsh)", bridge: "OpenCode bridge", opencode: "OpenCode CLI",
     app: "Download the app",
     opt: "Install OpenCode CLI too (optional — the free models work without it)",
     start: "Install",
@@ -173,7 +175,7 @@ const T = {
   pt: {
     title: "Instalar o DeepSeek Harness",
     sub: "Janela nativa, modelos free do OpenCode, sem navegador. O instalador pula o que já existe no seu PC.",
-    node: "Node.js", dsh: "DeepSeek Harness (dsh)", opencode: "OpenCode CLI",
+    node: "Node.js", dsh: "DeepSeek Harness (dsh)", bridge: "OpenCode bridge", opencode: "OpenCode CLI",
     app: "Baixar o aplicativo",
     opt: "Instalar o OpenCode CLI também (opcional — os modelos free funcionam sem ele)",
     start: "Instalar",
@@ -204,6 +206,7 @@ function pick(l) {
   $('t-sub').textContent = t.sub;
   $('l-node').textContent = t.node; $('h-node').textContent = t.need;
   $('l-dsh').textContent = t.dsh; $('h-dsh').textContent = t.need;
+  $('l-bridge').textContent = t.bridge; $('h-bridge').textContent = t.need;
   $('l-opencode').textContent = t.opencode; $('h-opencode').textContent = t.optHint;
   $('l-app').textContent = t.app; $('h-app').textContent = t.need;
   $('l-opt').textContent = t.opt;
@@ -212,6 +215,7 @@ function pick(l) {
   $('st-run').textContent = t.working;
   $('pl-node').textContent = t.node;
   $('pl-dsh').textContent = t.dsh;
+  $('pl-bridge').textContent = t.bridge;
   $('pl-opencode').textContent = t.opencode;
   $('pl-app').textContent = t.app;
   $('t-done').textContent = t.done;
@@ -230,7 +234,7 @@ function begin() {
 
 window.autoStart = function (l) { pick(l); setTimeout(begin, 300); };
 
-const order = ['node', 'dsh', 'opencode', 'app'];
+const order = ['node', 'dsh', 'bridge', 'opencode', 'app'];
 let finished = 0;
 
 window.step = function (id, state, detail) {

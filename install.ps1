@@ -83,6 +83,19 @@ else {
     Write-Ok 'dsh instalado'
 }
 
+# ---------------------------------------------------------------- Bridge
+Write-Step 'OpenCode bridge (DSH plugin)'
+$profilePkg = Join-Path $env:USERPROFILE '.dsh\profiles\web\package.json'
+$hasBridge = (Test-Path $profilePkg) -and ((Get-Content $profilePkg -Raw) -match 'dsh-opencode-bridge')
+if ($hasBridge) {
+    Write-Skip 'bridge já instalado'
+}
+else {
+    Write-Host '    instalando dsh-opencode-bridge@0.5.2...'
+    & dsh plugin --profile web add dsh-opencode-bridge@0.5.2
+    Write-Ok 'bridge instalado'
+}
+
 # ---------------------------------------------------------------- OpenCode
 Write-Step 'OpenCode CLI'
 if (Test-Cmd opencode) {
@@ -131,7 +144,7 @@ if ($isAdmin) {
     $key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\DeepSeekHarness'
     New-Item -Path $key -Force | Out-Null
     Set-ItemProperty -Path $key -Name DisplayName -Value $AppName
-    Set-ItemProperty -Path $key -Name DisplayVersion -Value '1.3.1'
+    Set-ItemProperty -Path $key -Name DisplayVersion -Value '1.4.0'
     Set-ItemProperty -Path $key -Name Publisher -Value 'Ryanabcraft'
     Set-ItemProperty -Path $key -Name DisplayIcon -Value $target
     Set-ItemProperty -Path $key -Name InstallLocation -Value $InstallDir
