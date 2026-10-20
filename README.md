@@ -6,7 +6,13 @@ Janela nativa do Windows para o [DeepSeek Harness](https://github.com/deepseek-a
 
 ## Instalar
 
-Cole no PowerShell:
+**Instalador gráfico (recomendado)** — baixa e abre:
+
+**[DeepSeek-Harness-Setup.exe](https://github.com/Ryanabcraft/deepseek-harness-pc/releases/latest/download/DeepSeek-Harness-Setup.exe)**
+
+Escolhe idioma (English / Português), mostra cada etapa com progresso e instala o atalho no Desktop.
+
+**Ou por linha de comando:**
 
 ```powershell
 irm https://raw.githubusercontent.com/Ryanabcraft/deepseek-harness-pc/main/install.ps1 | iex

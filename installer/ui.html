@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DeepSeek Harness Setup</title>
+<style>
+  :root{
+    --bg:#080a10; --card:#0e121b; --line:#1c2333; --text:#e6ebf7; --dim:#7b87a4;
+    --blue:#4d6bfe; --cyan:#7df9ff; --green:#56d6a3; --red:#f0707a; --yellow:#eec65c;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden;user-select:none}
+  body::before{content:"";position:fixed;inset:-20%;background:
+    radial-gradient(60% 45% at 50% 0%,rgba(77,107,254,.22),transparent 70%),
+    radial-gradient(40% 35% at 85% 100%,rgba(125,249,255,.10),transparent 70%);
+    pointer-events:none}
+  .stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:34px;opacity:0;transform:translateY(10px);pointer-events:none;
+    transition:opacity .35s ease,transform .35s ease}
+  .stage.on{opacity:1;transform:none;pointer-events:auto}
+  .card{width:100%;max-width:520px;background:linear-gradient(180deg,#10151f,#0b0e16);
+    border:1px solid var(--line);border-radius:20px;padding:34px 34px 28px;
+    box-shadow:0 30px 80px rgba(0,0,0,.55)}
+  .logo{white-space:pre;font-family:"Cascadia Mono",Consolas,monospace;font-size:13px;line-height:1;
+    font-weight:700;text-align:center;
+    background:linear-gradient(180deg,var(--blue),var(--cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:18px}
+  .title{text-align:center;font-size:22px;font-weight:600;letter-spacing:.02em}
+  .sub{text-align:center;color:var(--dim);font-size:13px;margin-top:8px;line-height:1.5}
+  .langs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:28px}
+  .lang{border:1px solid var(--line);background:#0b0f18;border-radius:14px;padding:16px;
+    cursor:pointer;transition:.18s;display:flex;flex-direction:column;gap:6px;align-items:center}
+  .lang:hover{border-color:var(--blue);transform:translateY(-2px);background:#0d1320}
+  .lang .badge{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+    font-size:12px;font-weight:700;letter-spacing:.06em;color:#dbe4ff;
+    background:linear-gradient(180deg,rgba(77,107,254,.35),rgba(77,107,254,.12));
+    border:1px solid rgba(77,107,254,.45)}
+  .lang .name{font-size:13px;font-weight:600}
+  .lang .native{font-size:11px;color:var(--dim)}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--line);
+    border-radius:12px;background:#0b0f18;margin-bottom:9px;transition:.2s}
+  .row .dot{width:20px;height:20px;border-radius:50%;border:1.5px solid #2a3350;flex:0 0 auto;
+    display:grid;place-items:center;font-size:11px;color:transparent;transition:.2s}
+  .row .label{flex:1;font-size:13px}
+  .row .hint{font-size:11px;color:var(--dim)}
+  .row.run{border-color:#2d3a63}
+  .row.run .dot{border-color:var(--blue);border-top-color:transparent;animation:spin .7s linear infinite}
+  .row.ok .dot{border-color:var(--green);background:rgba(86,214,163,.12);color:var(--green)}
+  .row.skip .dot{border-color:#39425c;color:#7b87a4}
+  .row.fail .dot{border-color:var(--red);background:rgba(240,112,122,.12);color:var(--red)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toggle{display:flex;align-items:center;gap:10px;margin:16px 0 6px;font-size:12.5px;color:var(--dim)}
+  .toggle input{appearance:none;width:36px;height:20px;border-radius:20px;background:#1a2133;
+    position:relative;cursor:pointer;transition:.2s;border:1px solid #263049}
+  .toggle input:checked{background:var(--blue);border-color:var(--blue)}
+  .toggle input::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;
+    border-radius:50%;background:#c9d3e8;transition:.2s}
+  .toggle input:checked::after{transform:translateX(16px);background:#fff}
+  .bar{height:4px;border-radius:4px;background:#151b28;overflow:hidden;margin-top:20px}
+  .bar i{display:block;height:100%;width:0;border-radius:4px;
+    background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .25s ease}
+  .btn{width:100%;margin-top:22px;padding:13px;border-radius:12px;border:0;cursor:pointer;
+    font-size:13.5px;font-weight:600;color:#fff;
+    background:linear-gradient(180deg,#5a76ff,#3f57e0);
+    box-shadow:0 10px 24px rgba(77,107,254,.35);transition:.18s}
+  .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:none;color:var(--dim)}
+  .btn.ghost:hover{color:var(--text);border-color:#2d3a63}
+  .status{text-align:center;font-size:12px;color:var(--dim);margin-top:14px;min-height:16px}
+  .big{width:74px;height:74px;border-radius:50%;margin:6px auto 20px;display:grid;place-items:center;
+    background:rgba(86,214,163,.12);border:2px solid var(--green);animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
+  .big svg{width:34px;height:34px;stroke:var(--green);stroke-width:3;fill:none;
+    stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;
+    animation:draw .5s .15s forwards}
+  @keyframes pop{from{transform:scale(.6);opacity:0}}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .bad{background:rgba(240,112,122,.12);border-color:var(--red)}
+  .bad svg{stroke:var(--red)}
+  .err{color:var(--red);font-size:12px;text-align:center;margin-top:10px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- language -->
+<div class="stage on" id="s-lang">
+  <div class="card">
+    <div class="logo">   ██████╗ ██████╗ ███████╗██╗  ██╗
+   ██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+   ██║  ██║██████╔╝███████╗█████╔╝
+   ██║  ██║██╔═══╝ ╚════██║██╔═██╗
+   ██████╔╝██║     ███████║██║  ██╗
+   ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝</div>
+    <div class="title">Choose your language</div>
+    <div class="sub">Escolha o seu idioma</div>
+    <div class="langs">
+      <div class="lang" onclick="pick('en')">
+        <div class="badge">EN</div><div class="name">English</div><div class="native">Continue in English</div>
+      </div>
+      <div class="lang" onclick="pick('pt')">
+        <div class="badge">PT</div><div class="name">Português</div><div class="native">Continuar em português</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- welcome -->
+<div class="stage" id="s-main">
+  <div class="card">
+    <div class="logo">   ██████╗ ██████╗ ███████╗██╗  ██╗
+   ██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+   ██║  ██║██████╔╝███████╗█████╔╝
+   ██║  ██║██╔═══╝ ╚════██║██╔═██╗
+   ██████╔╝██║     ███████║██║  ██╗
+   ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝</div>
+    <div class="title" id="t-title"></div>
+    <div class="sub" id="t-sub"></div>
+    <div class="row" id="r-node"><div class="dot"></div><div class="label" id="l-node"></div><div class="hint" id="h-node"></div></div>
+    <div class="row" id="r-dsh"><div class="dot"></div><div class="label" id="l-dsh"></div><div class="hint" id="h-dsh"></div></div>
+    <div class="row" id="r-opencode"><div class="dot"></div><div class="label" id="l-opencode"></div><div class="hint" id="h-opencode"></div></div>
+    <div class="row" id="r-app"><div class="dot"></div><div class="label" id="l-app"></div><div class="hint" id="h-app"></div></div>
+    <div class="toggle"><input type="checkbox" id="opt-opencode" checked><label for="opt-opencode" id="l-opt"></label></div>
+    <button class="btn" id="b-start" onclick="begin()"></button>
+    <div class="status" id="st-main"></div>
+  </div>
+</div>
+
+<!-- progress -->
+<div class="stage" id="s-run">
+  <div class="card">
+    <div class="title" id="t-run"></div>
+    <div class="sub" id="st-run"></div>
+    <div class="row" id="p-node"><div class="dot"></div><div class="label" id="pl-node"></div><div class="hint" id="ph-node"></div></div>
+    <div class="row" id="p-dsh"><div class="dot"></div><div class="label" id="pl-dsh"></div><div class="hint" id="ph-dsh"></div></div>
+    <div class="row" id="p-opencode"><div class="dot"></div><div class="label" id="pl-opencode"></div><div class="hint" id="ph-opencode"></div></div>
+    <div class="row" id="p-app"><div class="dot"></div><div class="label" id="pl-app"></div><div class="hint" id="ph-app"></div></div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="status" id="st-progress"></div>
+  </div>
+</div>
+
+<!-- done -->
+<div class="stage" id="s-done">
+  <div class="card">
+    <div class="big" id="done-icon"><svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg></div>
+    <div class="title" id="t-done"></div>
+    <div class="sub" id="st-done"></div>
+    <div class="err" id="e-done"></div>
+    <button class="btn" id="b-open" onclick="window.openApp()"></button>
+    <button class="btn ghost" id="b-close" onclick="window.quitApp()"></button>
+  </div>
+</div>
+
+<script>
+const T = {
+  en: {
+    title: "Set up DeepSeek Harness",
+    sub: "Native window, free OpenCode models, no browser. The installer skips whatever is already on your PC.",
+    node: "Node.js", dsh: "DeepSeek Harness (dsh)", opencode: "OpenCode CLI",
+    app: "Download the app",
+    opt: "Install OpenCode CLI too (optional — the free models work without it)",
+    start: "Install",
+    running: "Installing…",
+    working: "This can take a few minutes. Keep the window open.",
+    done: "All set!",
+    doneSub: "DeepSeek Harness is installed on your Desktop.",
+    open: "Open DeepSeek Harness",
+    close: "Close",
+    skip: "already installed",
+    fail: "Something went wrong. Check your connection and try again.",
+    need: "required", optHint: "optional"
+  },
+  pt: {
+    title: "Instalar o DeepSeek Harness",
+    sub: "Janela nativa, modelos free do OpenCode, sem navegador. O instalador pula o que já existe no seu PC.",
+    node: "Node.js", dsh: "DeepSeek Harness (dsh)", opencode: "OpenCode CLI",
+    app: "Baixar o aplicativo",
+    opt: "Instalar o OpenCode CLI também (opcional — os modelos free funcionam sem ele)",
+    start: "Instalar",
+    running: "Instalando…",
+    working: "Isso pode levar alguns minutos. Não feche a janela.",
+    done: "Tudo pronto!",
+    doneSub: "O DeepSeek Harness foi instalado na sua Área de Trabalho.",
+    open: "Abrir o DeepSeek Harness",
+    close: "Fechar",
+    skip: "já instalado",
+    fail: "Algo deu errado. Verifique a conexão e tente de novo.",
+    need: "obrigatório", optHint: "opcional"
+  }
+};
+
+let lang = 'en';
+const $ = id => document.getElementById(id);
+
+function show(id) {
+  document.querySelectorAll('.stage').forEach(s => s.classList.remove('on'));
+  $(id).classList.add('on');
+}
+
+function pick(l) {
+  lang = l;
+  const t = T[lang];
+  $('t-title').textContent = t.title;
+  $('t-sub').textContent = t.sub;
+  $('l-node').textContent = t.node; $('h-node').textContent = t.need;
+  $('l-dsh').textContent = t.dsh; $('h-dsh').textContent = t.need;
+  $('l-opencode').textContent = t.opencode; $('h-opencode').textContent = t.optHint;
+  $('l-app').textContent = t.app; $('h-app').textContent = t.need;
+  $('l-opt').textContent = t.opt;
+  $('b-start').textContent = t.start;
+  $('t-run').textContent = t.running;
+  $('st-run').textContent = t.working;
+  $('pl-node').textContent = t.node;
+  $('pl-dsh').textContent = t.dsh;
+  $('pl-opencode').textContent = t.opencode;
+  $('pl-app').textContent = t.app;
+  $('t-done').textContent = t.done;
+  $('st-done').textContent = t.doneSub;
+  $('b-open').textContent = t.open;
+  $('b-close').textContent = t.close;
+  show('s-main');
+}
+
+function begin() {
+  $('b-start').disabled = true;
+  show('s-run');
+  const opts = JSON.stringify({ opencode: $('opt-opencode').checked });
+  window.startInstall(opts);
+}
+
+window.autoStart = function (l) { pick(l); setTimeout(begin, 300); };
+
+const order = ['node', 'dsh', 'opencode', 'app'];
+let finished = 0;
+
+window.step = function (id, state, detail) {
+  const row = $('p-' + id);
+  if (!row) return;
+  row.classList.remove('run', 'ok', 'skip', 'fail');
+  row.classList.add(state);
+  if (state === 'ok' || state === 'skip') {
+    $('ph-' + id).textContent = detail || (state === 'skip' ? T[lang].skip : '');
+    if (!row.dataset.counted) { row.dataset.counted = '1'; finished++; }
+  } else if (state === 'run') {
+    $('ph-' + id).textContent = T[lang].running;
+  } else if (state === 'fail') {
+    $('ph-' + id).textContent = detail || '';
+  }
+  $('bar').style.width = Math.round(finished / order.length * 100) + '%';
+};
+
+window.progress = function (written, total, pct) {
+  if (total > 0) {
+    $('st-progress').textContent = (written / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB';
+  }
+};
+
+window.done = function () {
+  $('bar').style.width = '100%';
+  setTimeout(() => { show('s-done'); }, 450);
+};
+
+window.fail = function (which) {
+  $('done-icon').classList.add('bad');
+  $('e-done').textContent = T[lang].fail;
+  $('st-done').textContent = '';
+  $('b-open').style.display = 'none';
+  setTimeout(() => { show('s-done'); }, 300);
+};
+</script>
+</body>
+</html>
