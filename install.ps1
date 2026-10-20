@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
     DeepSeek Harness PC — installer
     Usage:  irm https://raw.githubusercontent.com/Ryanabcraft/deepseek-harness-pc/main/install.ps1 | iex
@@ -9,6 +9,7 @@ param(
     [switch]$NoShortcut
 )
 
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
