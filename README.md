@@ -41,6 +41,9 @@ O desinstalador lista o que está instalado e você marca só o que quer remover
 
 ## O que o app faz
 
+- **Na primeira execução** escolhe sozinho o primeiro modelo free disponível do catálogo e grava em `~/.dsh/profiles/<perfil>/cordis.patch.yml` (`agent-default-model`). Ordem de preferência:
+  `deepseek-v4.1-flash-free` → `minimax-m3.1-flash-free` → `mimo-v2.6-flash-free` → `glm-5.3-flash-free` → `nemotron-3.5-lightning-free` → `longcat-2.5-preview-free` → `beam-free` → `big-pickle` → `nemotron-3.5-super-vl-free`.
+  Depois disso nunca mais mexe — se o modelo sumir, a escolha continua. Faz backup `.bak-model` e escrita atômica.
 - Splash próprio e janela **WebView2** (sem navegador).
 - Roda `dsh web --no-open` oculto (`CREATE_NO_WINDOW`) e navega para a URL com token quando ela aparece.
 - Porta `3080` ocupada → sobe em porta livre automaticamente.

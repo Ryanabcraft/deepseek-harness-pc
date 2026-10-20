@@ -218,6 +218,15 @@ func killTree(pid int) {
 	exec.Command("taskkill", "/PID", strconv.Itoa(pid), "/T", "/F").Run()
 }
 
+func userPickedPort(args []string) bool {
+	for _, a := range args {
+		if a == "--port" || strings.HasPrefix(a, "--port=") {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	dsh, err := findDsh()
 	if err != nil {
@@ -226,47 +235,54 @@ func main() {
 	}
 
 	args := append([]string{"web", "--no-open"}, os.Args[1:]...)
-	userPickedPort := false
-	for _, a := range os.Args[1:] {
-		if a == "--port" || strings.HasPrefix(a, "--port=") {
-			userPickedPort = true
-		}
-	}
-	if !userPickedPort && !portFree(3080) {
-		args = append(args, "--port", "0")
-	}
+	profile := profileFromArgs(os.Args[1:])
 
-	target := dsh
-	if strings.ContainsAny(target, " \t") {
-		target = `"` + target + `"`
-	}
-
-	cmd := exec.Command("cmd.exe", append([]string{"/c", target}, args...)...)
-	if home, err := os.UserHomeDir(); err == nil {
-		cmd.Dir = home
-	}
-	// no console window for cmd.exe or the node child: the app owns the UI
-	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000, HideWindow: true}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		messageBox("DeepSeek Harness", "falha ao capturar o stdout do dsh:\n"+err.Error())
-		return
-	}
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	cmd.Env = os.Environ()
-
-	if err := cmd.Start(); err != nil {
-		messageBox("DeepSeek Harness", "falha ao iniciar o dsh:\n"+err.Error())
-		return
-	}
-	bindToJob(cmd.Process.Pid)
-	defer killTree(cmd.Process.Pid)
+	// window first: the splash covers the model check plus the dsh boot
+	app := webview.New(false)
+	app.SetTitle("DeepSeek Harness")
+	app.SetSize(1460, 920, webview.HintNone)
+	app.SetHtml(splashHTML)
+	go setWindowIcon()
 
 	urlCh := make(chan string, 1)
 	doneCh := make(chan struct{})
+	var gotURL atomic.Bool
+	var bootErr atomic.Value
+	var stderr strings.Builder
+
 	go func() {
 		defer close(doneCh)
+		ensureDefaultModel(profile)
+
+		if !userPickedPort(os.Args[1:]) && !portFree(3080) {
+			args = append(args, "--port", "0")
+		}
+		target := dsh
+		if strings.ContainsAny(target, " \t") {
+			target = `"` + target + `"`
+		}
+
+		cmd := exec.Command("cmd.exe", append([]string{"/c", target}, args...)...)
+		if home, err := os.UserHomeDir(); err == nil {
+			cmd.Dir = home
+		}
+		// no console window for cmd.exe or the node child: the app owns the UI
+		cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000, HideWindow: true}
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			bootErr.Store("falha ao capturar o stdout do dsh:\n" + err.Error())
+			return
+		}
+		cmd.Stderr = &stderr
+		cmd.Env = os.Environ()
+
+		if err := cmd.Start(); err != nil {
+			bootErr.Store("falha ao iniciar o dsh:\n" + err.Error())
+			return
+		}
+		bindToJob(cmd.Process.Pid)
+		defer killTree(cmd.Process.Pid)
+
 		sc := bufio.NewScanner(stdout)
 		sc.Buffer(make([]byte, 64*1024), 1<<20)
 		for sc.Scan() {
@@ -279,13 +295,6 @@ func main() {
 			}
 		}
 	}()
-
-	var gotURL atomic.Bool
-	app := webview.New(false)
-	app.SetTitle("DeepSeek Harness")
-	app.SetSize(1460, 920, webview.HintNone)
-	app.SetHtml(splashHTML)
-	go setWindowIcon()
 
 	go func() {
 		select {
@@ -305,6 +314,9 @@ func main() {
 
 	if !gotURL.Load() {
 		msg := "O harness nao chegou a publicar a URL."
+		if v := bootErr.Load(); v != nil {
+			msg = v.(string)
+		}
 		if s := strings.TrimSpace(stderr.String()); s != "" {
 			if len(s) > 1200 {
 				s = s[len(s)-1200:]
