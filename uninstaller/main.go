@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -155,16 +156,53 @@ func removeShortcuts() {
 	}
 }
 
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
 func removeApp() error {
 	_ = exec.Command("taskkill", "/IM", exeName, "/F").Run()
 	removeShortcuts()
 	_, _ = runHidden("reg", "delete", uninstallRegKey, "/f")
-	// this binary may live inside one of these folders, so delete after we exit
-	cmdline := "ping -n 3 127.0.0.1 >nul"
+
+	// deleting by path beats any cmd quoting trick
+	var stuck []string
 	for _, dir := range installedDirs() {
-		cmdline += " & rmdir /s /q \"" + dir + "\""
+		if _, err := os.Stat(dir); err != nil {
+			continue
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			stuck = append(stuck, dir)
+		}
 	}
-	cmd := exec.Command("cmd.exe", "/c", cmdline)
+	if len(stuck) == 0 {
+		return nil
+	}
+
+	// this exe is inside one of those folders: relaunch from %TEMP%, then the
+	// copy deletes the folder after this process is gone
+	self, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	tmp := filepath.Join(os.TempDir(), "DeepSeekHarness-Uninstall-cleanup.exe")
+	if err := copyFile(self, tmp); err != nil {
+		return err
+	}
+	cmd := exec.Command(tmp, append([]string{"--cleanup"}, stuck...)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000, HideWindow: true}
 	return cmd.Start()
 }
@@ -230,6 +268,20 @@ func uninstallAll(selJSON string) {
 }
 
 func main() {
+	// cleanup pass launched from %TEMP% after the real uninstaller exits
+	if len(os.Args) > 1 && os.Args[1] == "--cleanup" {
+		time.Sleep(1200 * time.Millisecond)
+		for _, dir := range os.Args[2:] {
+			for i := 0; i < 8; i++ {
+				if err := os.RemoveAll(dir); err == nil || os.IsNotExist(err) {
+					break
+				}
+				time.Sleep(400 * time.Millisecond)
+			}
+		}
+		return
+	}
+
 	app = webview.New(false)
 	defer app.Destroy()
 	app.SetTitle("DeepSeek Harness Uninstall")
