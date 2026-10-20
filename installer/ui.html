@@ -163,7 +163,7 @@ const T = {
     running: "Installing…",
     working: "This can take a few minutes. Keep the window open.",
     done: "All set!",
-    doneSub: "DeepSeek Harness is installed on your Desktop.",
+    doneSub: "DeepSeek Harness is installed in Program Files, with a shortcut on your Desktop.",
     open: "Open DeepSeek Harness",
     close: "Close",
     skip: "already installed",
@@ -180,7 +180,7 @@ const T = {
     running: "Instalando…",
     working: "Isso pode levar alguns minutos. Não feche a janela.",
     done: "Tudo pronto!",
-    doneSub: "O DeepSeek Harness foi instalado na sua Área de Trabalho.",
+    doneSub: "O DeepSeek Harness foi instalado em Program Files, com atalho na sua Área de Trabalho.",
     open: "Abrir o DeepSeek Harness",
     close: "Fechar",
     skip: "já instalado",
@@ -238,13 +238,15 @@ window.step = function (id, state, detail) {
   if (!row) return;
   row.classList.remove('run', 'ok', 'skip', 'fail');
   row.classList.add(state);
-  if (state === 'ok' || state === 'skip') {
-    $('ph-' + id).textContent = detail || (state === 'skip' ? T[lang].skip : '');
-    if (!row.dataset.counted) { row.dataset.counted = '1'; finished++; }
-  } else if (state === 'run') {
-    $('ph-' + id).textContent = T[lang].running;
-  } else if (state === 'fail') {
-    $('ph-' + id).textContent = detail || '';
+  let text = '';
+  if (state === 'run') text = T[lang].running;
+  else if (detail && detail.startsWith('present')) text = T[lang].skip;
+  else if (detail && !detail.startsWith('installed')) text = detail;
+  else if (state === 'skip') text = T[lang].skip;
+  $('ph-' + id).textContent = text;
+  if ((state === 'ok' || state === 'skip') && !row.dataset.counted) {
+    row.dataset.counted = '1';
+    finished++;
   }
   $('bar').style.width = Math.round(finished / order.length * 100) + '%';
 };

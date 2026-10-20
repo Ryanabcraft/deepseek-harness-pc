@@ -18,6 +18,8 @@ Escolhe idioma (English / Português), mostra cada etapa com progresso e instala
 irm https://raw.githubusercontent.com/Ryanabcraft/deepseek-harness-pc/main/install.ps1 | iex
 ```
 
+Instala em `C:\Program Files\DeepSeek Harness` (pede UAC uma vez; se recusar, cai para `%LOCALAPPDATA%`), com atalho no Desktop e no Menu Iniciar. Ao clicar em **Abrir**, o setup fecha sozinho.
+
 O instalador faz, em ordem, e **pula o que já existe**:
 
 1. **Node.js LTS** — se não houver `node`, instala via winget.

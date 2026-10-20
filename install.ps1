@@ -17,7 +17,12 @@ $Repo       = 'Ryanabcraft/deepseek-harness-pc'
 $AppName    = 'DeepSeek Harness'
 $ExeName    = 'DeepSeek Harness.exe'
 $AssetName  = 'DeepSeek-Harness.exe'
-$InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\DeepSeekHarness'
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if ($isAdmin) {
+    $InstallDir = Join-Path $env:ProgramFiles 'DeepSeek Harness'
+} else {
+    $InstallDir = Join-Path $env:LOCALAPPDATA 'Programs\DeepSeekHarness'
+}
 
 function Write-Step($m) { Write-Host "`n==> $m" -ForegroundColor Cyan }
 function Write-Ok($m)   { Write-Host "    ok   $m" -ForegroundColor Green }
@@ -116,16 +121,20 @@ catch {
 Write-Ok "instalado em $target"
 
 if (-not $NoShortcut) {
-    $desktop = [Environment]::GetFolderPath('Desktop')
-    $lnkPath = Join-Path $desktop "$AppName.lnk"
-    $shell   = New-Object -ComObject WScript.Shell
-    $lnk     = $shell.CreateShortcut($lnkPath)
-    $lnk.TargetPath       = $target
-    $lnk.WorkingDirectory = $InstallDir
-    $lnk.IconLocation     = "$target,0"
-    $lnk.Description      = 'DeepSeek Harness web console'
-    $lnk.Save()
-    Write-Ok "atalho criado: $lnkPath"
+    $shell = New-Object -ComObject WScript.Shell
+    $places = @([Environment]::GetFolderPath('Desktop'))
+    if ($isAdmin) { $places += (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs') }
+    foreach ($place in $places) {
+        if (-not (Test-Path $place)) { continue }
+        $lnkPath = Join-Path $place "$AppName.lnk"
+        $lnk     = $shell.CreateShortcut($lnkPath)
+        $lnk.TargetPath       = $target
+        $lnk.WorkingDirectory = $InstallDir
+        $lnk.IconLocation     = "$target,0"
+        $lnk.Description      = 'DeepSeek Harness web console'
+        $lnk.Save()
+        Write-Ok "atalho criado: $lnkPath"
+    }
 }
 
 Write-Host "`nPronto. Abra '$AppName' no Desktop." -ForegroundColor Green

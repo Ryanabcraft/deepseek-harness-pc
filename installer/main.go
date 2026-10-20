@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 
 	webview "github.com/webview/webview_go"
 )
@@ -20,16 +21,73 @@ import (
 var uiHTML string
 
 const (
-	repoURL    = "https://github.com/Ryanabcraft/deepseek-harness-pc"
-	assetURL   = repoURL + "/releases/latest/download/DeepSeek-Harness.exe"
-	appName    = "DeepSeek Harness"
-	exeName    = "DeepSeek Harness.exe"
-	installDir = `%LOCALAPPDATA%\Programs\DeepSeekHarness`
+	repoURL  = "https://github.com/Ryanabcraft/deepseek-harness-pc"
+	assetURL = repoURL + "/releases/latest/download/DeepSeek-Harness.exe"
+	appName  = "DeepSeek Harness"
+	exeName  = "DeepSeek Harness.exe"
 )
 
 var (
-	app webview.WebView
+	app      webview.WebView
+	user32   = syscall.NewLazyDLL("user32.dll")
+	kernel32 = syscall.NewLazyDLL("kernel32.dll")
+
+	procSetWindowIcon        = user32.NewProc("SendMessageW")
+	procLoadImageW           = user32.NewProc("LoadImageW")
+	procEnumWindows          = user32.NewProc("EnumWindows")
+	procGetWindowThreadPID   = user32.NewProc("GetWindowThreadProcessId")
+	procIsWindowVisible      = user32.NewProc("IsWindowVisible")
+	procGetWindowTextLengthW = user32.NewProc("GetWindowTextLengthW")
+	procGetModuleHandleW     = kernel32.NewProc("GetModuleHandleW")
 )
+
+const (
+	wmSetIcon = 0x0080
+	iconSmall = 0
+	iconBig   = 1
+	imageIcon = 1
+)
+
+var (
+	iconTargetPID uint32
+	iconHWND      uintptr
+)
+
+func enumWindowCallback(hwnd uintptr, _ uintptr) uintptr {
+	var pid uint32
+	procGetWindowThreadPID.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	if pid != iconTargetPID {
+		return 1
+	}
+	if vis, _, _ := procIsWindowVisible.Call(hwnd); vis == 0 {
+		return 1
+	}
+	if n, _, _ := procGetWindowTextLengthW.Call(hwnd); n == 0 {
+		return 1
+	}
+	iconHWND = hwnd
+	return 0
+}
+
+func setWindowIcon() {
+	iconTargetPID = uint32(os.Getpid())
+	cb := syscall.NewCallback(enumWindowCallback)
+	inst, _, _ := procGetModuleHandleW.Call(0)
+	for i := 0; i < 120; i++ {
+		iconHWND = 0
+		procEnumWindows.Call(cb, 0)
+		if iconHWND != 0 {
+			if big, _, _ := procLoadImageW.Call(inst, 1, imageIcon, 32, 32, 0); big != 0 {
+				procSetWindowIcon.Call(iconHWND, wmSetIcon, iconBig, big)
+			}
+			if small, _, _ := procLoadImageW.Call(inst, 1, imageIcon, 16, 16, 0); small != 0 {
+				procSetWindowIcon.Call(iconHWND, wmSetIcon, iconSmall, small)
+			}
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
 
 func emit(js string) {
 	app.Dispatch(func() { app.Eval(js) })
@@ -57,8 +115,6 @@ func has(cmd string) bool {
 }
 
 func refreshPath() {
-	machine := os.Getenv("PATH")
-	_ = machine
 	ps := `[Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`
 	out, err := runHidden("powershell", "-NoProfile", "-Command", ps)
 	if err == nil && strings.TrimSpace(out) != "" {
@@ -66,20 +122,41 @@ func refreshPath() {
 	}
 }
 
-func localAppData() string {
-	return os.Getenv("LOCALAPPDATA")
+func localAppData() string { return os.Getenv("LOCALAPPDATA") }
+
+func psQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
-func ensureNode() (string, error) {
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
+// ---------------------------------------------------------------- install steps
+
+func ensureNode() (string, string, error) {
 	if has("node") {
 		out, _ := runHidden("node", "--version")
-		return out, nil
+		return "ok", "present:" + out, nil
 	}
 	step("node", "run", "")
 	if !has("winget") {
-		return "", fmt.Errorf("winget not available")
+		return "fail", "", fmt.Errorf("winget not available")
 	}
-	_, err := runHidden("winget", "install", "--id", "OpenJS.NodeJS.LTS", "-e", "--silent",
+	runHidden("winget", "install", "--id", "OpenJS.NodeJS.LTS", "-e", "--silent",
 		"--accept-package-agreements", "--accept-source-agreements")
 	refreshPath()
 	if !has("node") {
@@ -87,14 +164,11 @@ func ensureNode() (string, error) {
 			os.Setenv("PATH", `C:\Program Files\nodejs;`+os.Getenv("PATH"))
 		}
 	}
-	if err != nil && !has("node") {
-		return "", err
-	}
 	if !has("node") {
-		return "", fmt.Errorf("node not on PATH after install")
+		return "fail", "", fmt.Errorf("node not on PATH after install")
 	}
 	out, _ := runHidden("node", "--version")
-	return out, nil
+	return "ok", "installed:" + out, nil
 }
 
 func npmCmd() string {
@@ -104,31 +178,36 @@ func npmCmd() string {
 	return "npm"
 }
 
-func ensureDsh() (string, error) {
+func ensureDsh() (string, string, error) {
 	if has("dsh") {
-		return "installed", nil
+		return "ok", "present:", nil
 	}
 	step("dsh", "run", "")
 	if _, err := runHidden(npmCmd(), "install", "-g", "@deepseek-ai/dsh"); err != nil {
-		return "", err
+		return "fail", "", err
 	}
 	refreshPath()
 	if !has("dsh") {
-		return "", fmt.Errorf("dsh not on PATH after install")
+		return "fail", "", fmt.Errorf("dsh not on PATH after install")
 	}
-	return "installed", nil
+	return "ok", "installed:", nil
 }
 
-func ensureOpencode() (string, error) {
+func ensureOpencode(want bool) (string, string, error) {
 	if has("opencode") {
-		return "skip", nil
+		return "ok", "present:", nil
+	}
+	if !want {
+		return "skip", "", nil
 	}
 	step("opencode", "run", "")
 	if _, err := runHidden(npmCmd(), "install", "-g", "@opencode/cli"); err != nil {
-		return "", err
+		return "fail", "", err
 	}
-	return "installed", nil
+	return "ok", "installed:", nil
 }
+
+// ---------------------------------------------------------------- app placement
 
 func download(url, target string) error {
 	resp, err := http.Get(url)
@@ -177,81 +256,146 @@ func download(url, target string) error {
 	return os.Rename(tmp, target)
 }
 
-func createShortcut(target string) error {
+func shortcutScript(target string) string {
+	dir := filepath.Dir(target)
 	desktop := filepath.Join(os.Getenv("USERPROFILE"), "Desktop")
-	lnk := filepath.Join(desktop, appName+".lnk")
-	script := fmt.Sprintf(`$s=(New-Object -ComObject WScript.Shell).CreateShortcut(%s);$s.TargetPath=%s;$s.WorkingDirectory=%s;$s.IconLocation=%s;$s.Save()`,
-		psQuote(lnk), psQuote(target), psQuote(filepath.Dir(target)), psQuote(target+",0"))
-	_, err := runHidden("powershell", "-NoProfile", "-Command", script)
-	return err
+	common := filepath.Join(os.Getenv("ProgramData"), "Microsoft", "Windows", "Start Menu", "Programs")
+	return fmt.Sprintf(`
+$target = %s
+$dir = %s
+$icon = $target + ',0'
+$shell = New-Object -ComObject WScript.Shell
+foreach ($where in @(%s, %s)) {
+  if (-not (Test-Path $where)) { continue }
+  $lnk = Join-Path $where %s
+  $s = $shell.CreateShortcut($lnk)
+  $s.TargetPath = $target
+  $s.WorkingDirectory = $dir
+  $s.IconLocation = $icon
+  $s.Description = 'DeepSeek Harness'
+  $s.Save()
+}`,
+		psQuote(target), psQuote(dir),
+		psQuote(desktop), psQuote(common),
+		psQuote(appName+".lnk"))
 }
 
-func psQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+func runElevated(script string) error {
+	dir, err := os.MkdirTemp("", "dsh-setup")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	file := filepath.Join(dir, "install.ps1")
+	if err := os.WriteFile(file, []byte("\ufeff"+script), 0o644); err != nil {
+		return err
+	}
+	cmd := exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+		fmt.Sprintf(`$p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',%s; exit $p.ExitCode`, psQuote(file)))
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	return cmd.Run()
 }
+
+// placeApp installs into C:\Program Files (elevating once) and falls back to
+// LOCALAPPDATA when the user declines the UAC prompt.
+func placeApp(tmp string) (string, error) {
+	dir := `C:\Program Files\DeepSeek Harness`
+	if custom := os.Getenv("DSH_SETUP_DIR"); custom != "" {
+		if err := os.MkdirAll(custom, 0o755); err == nil {
+			target := filepath.Join(custom, exeName)
+			if err := copyFile(tmp, target); err == nil {
+				_, _ = runHidden("powershell", "-NoProfile", "-Command", shortcutScript(target))
+				return target, nil
+			}
+		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err == nil {
+		target := filepath.Join(dir, exeName)
+		if err := copyFile(tmp, target); err == nil {
+			_, _ = runHidden("powershell", "-NoProfile", "-Command", shortcutScript(target))
+			return target, nil
+		}
+	}
+
+	// elevated copy + shortcuts
+	script := fmt.Sprintf(`
+$ErrorActionPreference = 'Stop'
+New-Item -ItemType Directory -Force -Path %s | Out-Null
+Copy-Item %s (Join-Path %s %s) -Force
+%s
+`, psQuote(dir), psQuote(tmp), psQuote(dir), psQuote(exeName), shortcutScript(filepath.Join(dir, exeName)))
+	if err := runElevated(script); err == nil {
+		return filepath.Join(dir, exeName), nil
+	}
+
+	// last resort: per-user install
+	dir = filepath.Join(localAppData(), "Programs", "DeepSeekHarness")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	target := filepath.Join(dir, exeName)
+	if err := copyFile(tmp, target); err != nil {
+		return "", err
+	}
+	_, _ = runHidden("powershell", "-NoProfile", "-Command", shortcutScript(target))
+	return target, nil
+}
+
+// ---------------------------------------------------------------- orchestration
 
 func installAll(optsJSON string) {
 	var opts struct {
-		Opencode bool `json:"opencode"`
+		Opencode bool   `json:"opencode"`
+		Lang     string `json:"lang"`
 	}
 	_ = json.Unmarshal([]byte(optsJSON), &opts)
 
-	// Node
-	if nodeVer, err := ensureNode(); err != nil {
+	if state, detail, err := ensureNode(); err != nil {
 		step("node", "fail", err.Error())
 		emit("window.fail(" + jsonStr("node") + ")")
 		return
 	} else {
-		step("node", "ok", nodeVer)
+		step("node", state, detail)
 	}
 
-	// DSH
-	if _, err := ensureDsh(); err != nil {
+	if state, detail, err := ensureDsh(); err != nil {
 		step("dsh", "fail", err.Error())
 		emit("window.fail(" + jsonStr("dsh") + ")")
 		return
-	}
-	step("dsh", "ok", "")
-
-	// OpenCode (optional)
-	if opts.Opencode {
-		if state, err := ensureOpencode(); err != nil {
-			step("opencode", "fail", err.Error())
-			emit("window.fail(" + jsonStr("opencode") + ")")
-			return
-		} else if state == "skip" {
-			step("opencode", "skip", "")
-		} else {
-			step("opencode", "ok", "")
-		}
 	} else {
-		step("opencode", "skip", "")
+		step("dsh", state, detail)
 	}
 
-	// App
+	if state, detail, err := ensureOpencode(opts.Opencode); err != nil {
+		step("opencode", "fail", err.Error())
+		emit("window.fail(" + jsonStr("opencode") + ")")
+		return
+	} else {
+		step("opencode", state, detail)
+	}
+
 	step("app", "run", "")
-	dir := filepath.Join(localAppData(), "Programs", "DeepSeekHarness")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	tmp := filepath.Join(os.TempDir(), "DeepSeekHarness-download.exe")
+	if err := download(assetURL, tmp); err != nil {
 		step("app", "fail", err.Error())
 		emit("window.fail(" + jsonStr("app") + ")")
 		return
 	}
-	target := filepath.Join(dir, exeName)
-	if err := download(assetURL, target); err != nil {
+	target, err := placeApp(tmp)
+	os.Remove(tmp)
+	if err != nil {
 		step("app", "fail", err.Error())
 		emit("window.fail(" + jsonStr("app") + ")")
 		return
 	}
-	step("app", "ok", "")
-
-	if err := createShortcut(target); err != nil {
-		step("shortcut", "fail", err.Error())
-	} else {
-		step("shortcut", "ok", "")
-	}
+	curTarget = target
+	step("app", "ok", "installed:")
+	step("shortcut", "ok", "installed:")
 
 	emit("window.done()")
 }
+
+var curTarget string
 
 func main() {
 	app = webview.New(false)
@@ -259,8 +403,8 @@ func main() {
 	app.SetTitle("DeepSeek Harness Setup")
 	app.SetSize(640, 740, webview.HintNone)
 	app.SetHtml(uiHTML)
+	go setWindowIcon()
 
-	// --auto [pt|en]: skip the language screen, useful for silent installs and testing
 	if len(os.Args) > 1 {
 		lang := "en"
 		for _, a := range os.Args[1:] {
@@ -279,10 +423,17 @@ func main() {
 		return "ok"
 	})
 	app.Bind("openApp", func() string {
-		target := filepath.Join(localAppData(), "Programs", "DeepSeekHarness", exeName)
+		target := curTarget
+		if target == "" {
+			target = filepath.Join(`C:\Program Files\DeepSeek Harness`, exeName)
+		}
 		cmd := exec.Command(target)
 		cmd.Dir = filepath.Dir(target)
 		_ = cmd.Start()
+		go func() {
+			time.Sleep(900 * time.Millisecond)
+			app.Dispatch(func() { app.Terminate() })
+		}()
 		return "ok"
 	})
 	app.Bind("quitApp", func() string {
