@@ -57,6 +57,22 @@ func TestRewriteAppendsWhenMissing(t *testing.T) {
 	}
 }
 
+func TestRewriteReplacesEmptyArrayScaffold(t *testing.T) {
+	scaffold := "# header comment\n# second line\n[]\n"
+	out, changed := rewriteDefaultModel(scaffold, "deepseek-v4.1-flash-free")
+	if !changed {
+		t.Fatal("expected change")
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == "[]" {
+			t.Fatalf("empty array left behind:\n%s", out)
+		}
+	}
+	if !strings.Contains(out, "- id: agent-default-model") || !strings.Contains(out, "model: deepseek-v4.1-flash-free") {
+		t.Fatalf("block not appended:\n%s", out)
+	}
+}
+
 func TestPickFallbackOrder(t *testing.T) {
 	available := map[string]bool{
 		"big-pickle":           true,

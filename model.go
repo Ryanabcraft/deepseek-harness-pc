@@ -106,7 +106,17 @@ func rewriteDefaultModel(content, modelID string) (string, bool) {
 		if content != "" && !strings.HasSuffix(content, "\n") {
 			content += "\n"
 		}
-		return content + block, true
+		// DSH scaffolds the patch with a bare empty array; appending a block
+		// after it makes two YAML documents and dsh refuses to boot.
+		lines := strings.Split(content, "\n")
+		kept := lines[:0]
+		for _, line := range lines {
+			if strings.TrimSpace(line) == "[]" {
+				continue
+			}
+			kept = append(kept, line)
+		}
+		return strings.Join(kept, "\n") + block, true
 	}
 
 	end := len(lines)
