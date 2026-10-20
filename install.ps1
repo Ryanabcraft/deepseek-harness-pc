@@ -118,6 +118,29 @@ try {
 catch {
     throw "Falha ao baixar o app ($url). Verifique se existe um release publicado. Detalhe: $($_.Exception.Message)"
 }
+$uninstaller = Join-Path $InstallDir 'DeepSeek-Harness-Uninstall.exe'
+try {
+    Invoke-WebRequest -Uri "https://github.com/$Repo/releases/latest/download/DeepSeek-Harness-Uninstall.exe" -OutFile $uninstaller -UseBasicParsing
+    Write-Ok 'desinstalador instalado'
+}
+catch {
+    Write-Note 'desinstalador não baixado (o release pode não ter o asset)'
+}
+
+if ($isAdmin) {
+    $key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\DeepSeekHarness'
+    New-Item -Path $key -Force | Out-Null
+    Set-ItemProperty -Path $key -Name DisplayName -Value $AppName
+    Set-ItemProperty -Path $key -Name DisplayVersion -Value '1.2.0'
+    Set-ItemProperty -Path $key -Name Publisher -Value 'Ryanabcraft'
+    Set-ItemProperty -Path $key -Name DisplayIcon -Value $target
+    Set-ItemProperty -Path $key -Name InstallLocation -Value $InstallDir
+    Set-ItemProperty -Path $key -Name UninstallString -Value $uninstaller
+    Set-ItemProperty -Path $key -Name NoModify -Value 1 -Type DWord
+    Set-ItemProperty -Path $key -Name NoRepair -Value 1 -Type DWord
+    Write-Ok 'registrado em Aplicativos instalados'
+}
+
 Write-Ok "instalado em $target"
 
 if (-not $NoShortcut) {

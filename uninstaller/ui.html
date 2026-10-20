@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DeepSeek Harness Uninstall</title>
+<style>
+  :root{
+    --bg:#080a10; --card:#0e121b; --line:#1c2333; --text:#e6ebf7; --dim:#7b87a4;
+    --blue:#4d6bfe; --cyan:#7df9ff; --green:#56d6a3; --red:#f0707a; --yellow:#eec65c;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+    font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden;user-select:none}
+  body::before{content:"";position:fixed;inset:-20%;background:
+    radial-gradient(60% 45% at 50% 0%,rgba(240,112,122,.12),transparent 70%),
+    radial-gradient(40% 35% at 85% 100%,rgba(77,107,254,.08),transparent 70%);
+    pointer-events:none}
+  .stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:34px;opacity:0;transform:translateY(10px);pointer-events:none;
+    transition:opacity .35s ease,transform .35s ease}
+  .stage.on{opacity:1;transform:none;pointer-events:auto}
+  .card{width:100%;max-width:520px;background:linear-gradient(180deg,#10151f,#0b0e16);
+    border:1px solid var(--line);border-radius:20px;padding:32px 32px 26px;
+    box-shadow:0 30px 80px rgba(0,0,0,.55)}
+  .logo{white-space:pre;font-family:"Cascadia Mono",Consolas,monospace;font-size:13px;line-height:1;
+    font-weight:700;text-align:center;
+    background:linear-gradient(180deg,var(--blue),var(--cyan));
+    -webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:16px}
+  .title{text-align:center;font-size:21px;font-weight:600}
+  .sub{text-align:center;color:var(--dim);font-size:12.5px;margin-top:8px;line-height:1.5}
+  .langs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:26px}
+  .lang{border:1px solid var(--line);background:#0b0f18;border-radius:14px;padding:16px;
+    cursor:pointer;transition:.18s;display:flex;flex-direction:column;gap:6px;align-items:center}
+  .lang:hover{border-color:var(--blue);transform:translateY(-2px);background:#0d1320}
+  .badge{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+    font-size:12px;font-weight:700;letter-spacing:.06em;color:#dbe4ff;
+    background:linear-gradient(180deg,rgba(77,107,254,.35),rgba(77,107,254,.12));
+    border:1px solid rgba(77,107,254,.45)}
+  .lang .name{font-size:13px;font-weight:600}
+  .lang .native{font-size:11px;color:var(--dim)}
+  .opt{display:flex;align-items:flex-start;gap:12px;padding:13px 14px;border:1px solid var(--line);
+    border-radius:12px;background:#0b0f18;margin-bottom:9px;transition:.2s;cursor:pointer}
+  .opt:hover{border-color:#2d3a63}
+  .opt input{appearance:none;width:18px;height:18px;border-radius:5px;border:1.5px solid #2a3350;
+    margin:1px 0 0;cursor:pointer;position:relative;flex:0 0 auto;transition:.15s}
+  .opt input:checked{background:var(--blue);border-color:var(--blue)}
+  .opt input:checked::after{content:"";position:absolute;left:5px;top:1.5px;width:4px;height:9px;
+    border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .opt.missing{opacity:.45;cursor:default}
+  .opt .txt{flex:1}
+  .opt .name{font-size:13px;font-weight:500}
+  .opt .hint{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4}
+  .opt .tag{font-size:10px;color:var(--dim);border:1px solid var(--line);border-radius:6px;
+    padding:2px 6px;align-self:center}
+  .btn{width:100%;margin-top:18px;padding:13px;border-radius:12px;border:0;cursor:pointer;
+    font-size:13.5px;font-weight:600;color:#fff;
+    background:linear-gradient(180deg,#f0707a,#c94d5a);
+    box-shadow:0 10px 24px rgba(240,112,122,.25);transition:.18s}
+  .btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none;filter:none}
+  .btn.ghost{background:transparent;border:1px solid var(--line);box-shadow:none;color:var(--dim)}
+  .btn.ghost:hover{color:var(--text);border-color:#2d3a63}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--line);
+    border-radius:12px;background:#0b0f18;margin-bottom:9px;transition:.2s}
+  .row .dot{width:20px;height:20px;border-radius:50%;border:1.5px solid #2a3350;flex:0 0 auto;
+    display:grid;place-items:center;font-size:11px;color:transparent;transition:.2s}
+  .row .label{flex:1;font-size:13px}
+  .row .hint{font-size:11px;color:var(--dim)}
+  .row.run{border-color:#2d3a63}
+  .row.run .dot{border-color:var(--blue);border-top-color:transparent;animation:spin .7s linear infinite}
+  .row.ok .dot{border-color:var(--green);background:rgba(86,214,163,.12);color:var(--green)}
+  .row.fail .dot{border-color:var(--red);background:rgba(240,112,122,.12);color:var(--red)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .bar{height:4px;border-radius:4px;background:#151b28;overflow:hidden;margin-top:18px}
+  .bar i{display:block;height:100%;width:0;border-radius:4px;
+    background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .25s ease}
+  .status{text-align:center;font-size:12px;color:var(--dim);margin-top:14px;min-height:16px}
+  .big{width:74px;height:74px;border-radius:50%;margin:6px auto 18px;display:grid;place-items:center;
+    background:rgba(86,214,163,.12);border:2px solid var(--green);animation:pop .45s cubic-bezier(.2,1.4,.4,1)}
+  .big svg{width:34px;height:34px;stroke:var(--green);stroke-width:3;fill:none;
+    stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;
+    animation:draw .5s .15s forwards}
+  @keyframes pop{from{transform:scale(.6);opacity:0}}
+  @keyframes draw{to{stroke-dashoffset:0}}
+</style>
+</head>
+<body>
+
+<div class="stage on" id="s-lang">
+  <div class="card">
+    <div class="logo">   ██████╗ ██████╗ ███████╗██╗  ██╗
+   ██╔══██╗██╔══██╗██╔════╝██║ ██╔╝
+   ██║  ██║██████╔╝███████╗█████╔╝
+   ██║  ██║██╔═══╝ ╚════██║██╔═██╗
+   ██████╔╝██║     ███████║██║  ██╗
+   ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝</div>
+    <div class="title">Uninstall DeepSeek Harness</div>
+    <div class="sub">Choose your language · Escolha o seu idioma</div>
+    <div class="langs">
+      <div class="lang" onclick="pick('en')"><div class="badge">EN</div><div class="name">English</div><div class="native">Continue in English</div></div>
+      <div class="lang" onclick="pick('pt')"><div class="badge">PT</div><div class="name">Português</div><div class="native">Continuar em português</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="stage" id="s-main">
+  <div class="card">
+    <div class="title" id="t-title"></div>
+    <div class="sub" id="t-sub"></div>
+    <div style="height:18px"></div>
+    <label class="opt" id="o-app"><input type="checkbox" data-id="app" checked><div class="txt"><div class="name" id="n-app"></div><div class="hint" id="h-app"></div></div></label>
+    <label class="opt" id="o-dsh"><input type="checkbox" data-id="dsh" checked><div class="txt"><div class="name" id="n-dsh"></div><div class="hint" id="h-dsh"></div></div></label>
+    <label class="opt" id="o-opencode"><input type="checkbox" data-id="opencode" checked><div class="txt"><div class="name" id="n-opencode"></div><div class="hint" id="h-opencode"></div></div></label>
+    <label class="opt" id="o-node"><input type="checkbox" data-id="node"><div class="txt"><div class="name" id="n-node"></div><div class="hint" id="h-node"></div></div></label>
+    <label class="opt" id="o-data"><input type="checkbox" data-id="data"><div class="txt"><div class="name" id="n-data"></div><div class="hint" id="h-data"></div></div></label>
+    <button class="btn" id="b-run" onclick="run()"></button>
+    <button class="btn ghost" onclick="window.quitApp()" id="b-cancel"></button>
+  </div>
+</div>
+
+<div class="stage" id="s-run">
+  <div class="card">
+    <div class="title" id="t-run"></div>
+    <div class="sub" id="st-run"></div>
+    <div style="height:18px"></div>
+    <div class="row" id="p-app"><div class="dot"></div><div class="label" id="pl-app"></div><div class="hint" id="ph-app"></div></div>
+    <div class="row" id="p-dsh"><div class="dot"></div><div class="label" id="pl-dsh"></div><div class="hint" id="ph-dsh"></div></div>
+    <div class="row" id="p-opencode"><div class="dot"></div><div class="label" id="pl-opencode"></div><div class="hint" id="ph-opencode"></div></div>
+    <div class="row" id="p-node"><div class="dot"></div><div class="label" id="pl-node"></div><div class="hint" id="ph-node"></div></div>
+    <div class="row" id="p-data"><div class="dot"></div><div class="label" id="pl-data"></div><div class="hint" id="ph-data"></div></div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="status" id="st-progress"></div>
+  </div>
+</div>
+
+<div class="stage" id="s-done">
+  <div class="card">
+    <div class="big"><svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg></div>
+    <div class="title" id="t-done"></div>
+    <div class="sub" id="st-done"></div>
+    <button class="btn ghost" onclick="window.quitApp()" id="b-close"></button>
+  </div>
+</div>
+
+<script>
+const T = {
+  en: {
+    title: "What do you want to remove?",
+    sub: "Only checked items are uninstalled. Nothing runs in the background.",
+    app: "DeepSeek Harness (app)", appHint: "Program Files folder and Desktop shortcuts",
+    dsh: "DeepSeek Harness CLI (dsh)", dshHint: "global npm package @deepseek-ai/dsh",
+    opencode: "OpenCode CLI", opencodeHint: "global npm package @opencode/cli",
+    node: "Node.js", nodeHint: "shared runtime — other projects may depend on it",
+    data: "DSH data (~/.dsh)", dataHint: "sessions, settings and credentials — cannot be undone",
+    run: "Uninstall selected", cancel: "Cancel",
+    running: "Removing…", done: "Removed", doneSub: "The selected items were uninstalled.",
+    close: "Close", missing: "not installed", removed: "removed", failed: "failed",
+    start: "Starting…"
+  },
+  pt: {
+    title: "O que você quer remover?",
+    sub: "Só o que estiver marcado será desinstalado. Nada roda em segundo plano.",
+    app: "DeepSeek Harness (app)", appHint: "pasta em Program Files e atalhos do Desktop",
+    dsh: "DeepSeek Harness CLI (dsh)", dshHint: "pacote global do npm @deepseek-ai/dsh",
+    opencode: "OpenCode CLI", opencodeHint: "pacote global do npm @opencode/cli",
+    node: "Node.js", nodeHint: "runtime compartilhado — outros projetos podem depender dele",
+    data: "Dados do DSH (~/.dsh)", dataHint: "sessões, configurações e credenciais — não dá pra desfazer",
+    run: "Desinstalar selecionados", cancel: "Cancelar",
+    running: "Removendo…", done: "Removido", doneSub: "Os itens selecionados foram desinstalados.",
+    close: "Fechar", missing: "não instalado", removed: "removido", failed: "falhou",
+    start: "Iniciando…"
+  }
+};
+
+let lang = 'en';
+let state = {};
+const $ = id => document.getElementById(id);
+
+function show(id) {
+  document.querySelectorAll('.stage').forEach(s => s.classList.remove('on'));
+  $(id).classList.add('on');
+}
+
+async function pick(l) {
+  lang = l;
+  const t = T[lang];
+  const raw = await window.scan();
+  state = JSON.parse(raw);
+  $('t-title').textContent = t.title;
+  $('t-sub').textContent = t.sub;
+  $('b-run').textContent = t.run;
+  $('b-cancel').textContent = t.cancel;
+  $('t-run').textContent = t.running;
+  $('st-run').textContent = t.sub;
+  $('t-done').textContent = t.done;
+  $('st-done').textContent = t.doneSub;
+  $('b-close').textContent = t.close;
+
+  for (const id of ['app', 'dsh', 'opencode', 'node', 'data']) {
+    $('n-' + id).textContent = t[id];
+    $('h-' + id).textContent = t[id + 'Hint'];
+    $('pl-' + id).textContent = t[id];
+    const box = document.querySelector('input[data-id="' + id + '"]');
+    const present = !!state[id];
+    if (!present) {
+      $('o-' + id).classList.add('missing');
+      box.checked = false;
+      box.disabled = true;
+      $('h-' + id).textContent = t.missing;
+    } else {
+      box.checked = (id !== 'node' && id !== 'data');
+    }
+  }
+  show('s-main');
+}
+
+function run() {
+  const sel = { app: false, dsh: false, opencode: false, node: false, data: false };
+  document.querySelectorAll('input[data-id]').forEach(b => { sel[b.dataset.id] = b.checked && !b.disabled; });
+  $('b-run').disabled = true;
+  show('s-run');
+  window.uninstall(JSON.stringify(sel));
+}
+
+const order = ['app', 'dsh', 'opencode', 'node', 'data'];
+let finished = 0;
+
+window.step = function (id, st, detail) {
+  const row = $('p-' + id);
+  if (!row) return;
+  row.classList.remove('run', 'ok', 'fail');
+  row.classList.add(st);
+  $('ph-' + id).textContent = st === 'run' ? T[lang].start : (st === 'ok' ? T[lang].removed : (detail || ''));
+  if (st === 'ok' && !row.dataset.counted) { row.dataset.counted = '1'; finished++; }
+  const total = document.querySelectorAll('#s-run .row:not([style*="display: none"])').length || order.length;
+  $('bar').style.width = Math.round(finished / Math.max(1, total) * 100) + '%';
+};
+
+window.done = function () {
+  $('bar').style.width = '100%';
+  setTimeout(() => show('s-done'), 400);
+};
+</script>
+</body>
+</html>

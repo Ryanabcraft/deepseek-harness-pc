@@ -21,10 +21,12 @@ import (
 var uiHTML string
 
 const (
-	repoURL  = "https://github.com/Ryanabcraft/deepseek-harness-pc"
-	assetURL = repoURL + "/releases/latest/download/DeepSeek-Harness.exe"
-	appName  = "DeepSeek Harness"
-	exeName  = "DeepSeek Harness.exe"
+	repoURL         = "https://github.com/Ryanabcraft/deepseek-harness-pc"
+	assetURL        = repoURL + "/releases/latest/download/DeepSeek-Harness.exe"
+	uninstallURL    = repoURL + "/releases/latest/download/DeepSeek-Harness-Uninstall.exe"
+	appName         = "DeepSeek Harness"
+	exeName         = "DeepSeek Harness.exe"
+	uninstallerName = "DeepSeek-Harness-Uninstall.exe"
 )
 
 var (
@@ -256,13 +258,15 @@ func download(url, target string) error {
 	return os.Rename(tmp, target)
 }
 
-func shortcutScript(target string) string {
+func installScript(target string) string {
 	dir := filepath.Dir(target)
 	desktop := filepath.Join(os.Getenv("USERPROFILE"), "Desktop")
 	common := filepath.Join(os.Getenv("ProgramData"), "Microsoft", "Windows", "Start Menu", "Programs")
+	uninst := filepath.Join(dir, uninstallerName)
 	return fmt.Sprintf(`
 $target = %s
 $dir = %s
+$uninst = %s
 $icon = $target + ',0'
 $shell = New-Object -ComObject WScript.Shell
 foreach ($where in @(%s, %s)) {
@@ -274,70 +278,43 @@ foreach ($where in @(%s, %s)) {
   $s.IconLocation = $icon
   $s.Description = 'DeepSeek Harness'
   $s.Save()
-}`,
-		psQuote(target), psQuote(dir),
-		psQuote(desktop), psQuote(common),
-		psQuote(appName+".lnk"))
+}
+$key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\DeepSeekHarness'
+New-Item -Path $key -Force | Out-Null
+Set-ItemProperty -Path $key -Name DisplayName -Value 'DeepSeek Harness'
+Set-ItemProperty -Path $key -Name DisplayVersion -Value '1.2.0'
+Set-ItemProperty -Path $key -Name Publisher -Value 'Ryanabcraft'
+Set-ItemProperty -Path $key -Name DisplayIcon -Value $target
+Set-ItemProperty -Path $key -Name InstallLocation -Value $dir
+Set-ItemProperty -Path $key -Name UninstallString -Value $uninst
+Set-ItemProperty -Path $key -Name NoModify -Value 1 -Type DWord
+Set-ItemProperty -Path $key -Name NoRepair -Value 1 -Type DWord
+`, psQuote(target), psQuote(dir), psQuote(uninst),
+		psQuote(desktop), psQuote(common), psQuote(appName+".lnk"))
 }
 
-func runElevated(script string) error {
-	dir, err := os.MkdirTemp("", "dsh-setup")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dir)
-	file := filepath.Join(dir, "install.ps1")
-	if err := os.WriteFile(file, []byte("\ufeff"+script), 0o644); err != nil {
-		return err
-	}
-	cmd := exec.Command("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-		fmt.Sprintf(`$p = Start-Process powershell -Verb RunAs -Wait -PassThru -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',%s; exit $p.ExitCode`, psQuote(file)))
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	return cmd.Run()
-}
-
-// placeApp installs into C:\Program Files (elevating once) and falls back to
-// LOCALAPPDATA when the user declines the UAC prompt.
-func placeApp(tmp string) (string, error) {
+// placeApp installs into C:\Program Files. The setup carries a
+// requireAdministrator manifest, so the copy needs no extra elevation prompt.
+// DSH_SETUP_DIR exists for tests and per-user installs.
+func placeApp(tmpApp, tmpUn string) (string, error) {
 	dir := `C:\Program Files\DeepSeek Harness`
 	if custom := os.Getenv("DSH_SETUP_DIR"); custom != "" {
-		if err := os.MkdirAll(custom, 0o755); err == nil {
-			target := filepath.Join(custom, exeName)
-			if err := copyFile(tmp, target); err == nil {
-				_, _ = runHidden("powershell", "-NoProfile", "-Command", shortcutScript(target))
-				return target, nil
-			}
-		}
+		dir = custom
 	}
-	if err := os.MkdirAll(dir, 0o755); err == nil {
-		target := filepath.Join(dir, exeName)
-		if err := copyFile(tmp, target); err == nil {
-			_, _ = runHidden("powershell", "-NoProfile", "-Command", shortcutScript(target))
-			return target, nil
-		}
-	}
-
-	// elevated copy + shortcuts
-	script := fmt.Sprintf(`
-$ErrorActionPreference = 'Stop'
-New-Item -ItemType Directory -Force -Path %s | Out-Null
-Copy-Item %s (Join-Path %s %s) -Force
-%s
-`, psQuote(dir), psQuote(tmp), psQuote(dir), psQuote(exeName), shortcutScript(filepath.Join(dir, exeName)))
-	if err := runElevated(script); err == nil {
-		return filepath.Join(dir, exeName), nil
-	}
-
-	// last resort: per-user install
-	dir = filepath.Join(localAppData(), "Programs", "DeepSeekHarness")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", err
+		dir = filepath.Join(localAppData(), "Programs", "DeepSeekHarness")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", err
+		}
 	}
 	target := filepath.Join(dir, exeName)
-	if err := copyFile(tmp, target); err != nil {
+	if err := copyFile(tmpApp, target); err != nil {
 		return "", err
 	}
-	_, _ = runHidden("powershell", "-NoProfile", "-Command", shortcutScript(target))
+	if tmpUn != "" {
+		_ = copyFile(tmpUn, filepath.Join(dir, uninstallerName))
+	}
+	_, _ = runHidden("powershell", "-NoProfile", "-Command", installScript(target))
 	return target, nil
 }
 
@@ -381,8 +358,13 @@ func installAll(optsJSON string) {
 		emit("window.fail(" + jsonStr("app") + ")")
 		return
 	}
-	target, err := placeApp(tmp)
+	tmpUn := filepath.Join(os.TempDir(), "DeepSeekHarness-uninstall.exe")
+	if err := download(uninstallURL, tmpUn); err != nil {
+		tmpUn = ""
+	}
+	target, err := placeApp(tmp, tmpUn)
 	os.Remove(tmp)
+	os.Remove(tmpUn)
 	if err != nil {
 		step("app", "fail", err.Error())
 		emit("window.fail(" + jsonStr("app") + ")")

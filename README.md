@@ -18,7 +18,7 @@ Escolhe idioma (English / Português), mostra cada etapa com progresso e instala
 irm https://raw.githubusercontent.com/Ryanabcraft/deepseek-harness-pc/main/install.ps1 | iex
 ```
 
-Instala em `C:\Program Files\DeepSeek Harness` (pede UAC uma vez; se recusar, cai para `%LOCALAPPDATA%`), com atalho no Desktop e no Menu Iniciar. Ao clicar em **Abrir**, o setup fecha sozinho.
+O setup pede UAC ao abrir (manifest `requireAdministrator`) e instala em `C:\Program Files\DeepSeek Harness`, com atalho no Desktop e no Menu Iniciar, entrada em **Aplicativos instalados** e desinstalador próprio. Ao clicar em **Abrir**, o setup fecha sozinho. Nenhum console/PowerShell aparece — tudo roda oculto.
 
 O instalador faz, em ordem, e **pula o que já existe**:
 
@@ -28,6 +28,16 @@ O instalador faz, em ordem, e **pula o que já existe**:
 4. **App** — baixa o `DeepSeek-Harness.exe` do último release, instala em `%LOCALAPPDATA%\Programs\DeepSeekHarness` e cria atalho no Desktop.
 
 Flags: `-Yes` (não pergunta nada, instala o OpenCode) e `-NoShortcut`.
+
+## Desinstalar
+
+Pelo **Aplicativos instalados** do Windows, pelo atalho `DeepSeek-Harness-Uninstall.exe` na pasta de instalação, ou:
+
+```powershell
+& "C:\Program Files\DeepSeek Harness\DeepSeek-Harness-Uninstall.exe"
+```
+
+O desinstalador lista o que está instalado e você marca só o que quer remover: app, `dsh`, `opencode`, Node.js (desmarcado por padrão) e dados do DSH em `~/.dsh` (desmarcado, irreversível).
 
 ## O que o app faz
 
