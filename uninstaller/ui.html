@@ -200,7 +200,7 @@ async function pick(l) {
       box.disabled = true;
       $('h-' + id).textContent = t.missing;
     } else {
-      box.checked = id !== 'node';
+      box.checked = id === 'app';
     }
   }
   show('s-main');

@@ -316,7 +316,7 @@ foreach ($where in @(%s, %s)) {
 $key = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\DeepSeekHarness'
 New-Item -Path $key -Force | Out-Null
 Set-ItemProperty -Path $key -Name DisplayName -Value 'DeepSeek Harness'
-Set-ItemProperty -Path $key -Name DisplayVersion -Value '1.5.0'
+Set-ItemProperty -Path $key -Name DisplayVersion -Value '1.5.1'
 Set-ItemProperty -Path $key -Name Publisher -Value 'Ryanabcraft'
 Set-ItemProperty -Path $key -Name DisplayIcon -Value $target
 Set-ItemProperty -Path $key -Name InstallLocation -Value $dir
