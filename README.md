@@ -38,7 +38,7 @@ Pelo **Aplicativos instalados** do Windows, pelo atalho `DeepSeek-Harness-Uninst
 & "C:\Program Files\DeepSeek Harness\DeepSeek-Harness-Uninstall.exe"
 ```
 
-O desinstalador lista o que está instalado e você marca só o que quer remover: app, `dsh`, `opencode`, Node.js (desmarcado por padrão) e dados do DSH em `~/.dsh` (desmarcado, irreversível).
+O desinstalador tem só três itens: **DeepSeek Harness** (marcado por padrão) remove o app, o `dsh`, a ponte OpenCode e os dados em `~/.dsh` — irreversível. **OpenCode CLI** e **Node.js** ficam como opcionais, desmarcados, porque são compartilhados com outros projetos.
 
 ## O que o app faz
 

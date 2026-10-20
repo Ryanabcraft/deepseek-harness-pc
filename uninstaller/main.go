@@ -108,11 +108,8 @@ func has(cmd string) bool {
 
 type state struct {
 	App      bool `json:"app"`
-	Dsh      bool `json:"dsh"`
-	Bridge   bool `json:"bridge"`
 	Opencode bool `json:"opencode"`
 	Node     bool `json:"node"`
-	Data     bool `json:"data"`
 }
 
 func bridgeInstalled() bool {
@@ -145,18 +142,18 @@ func installedDirs() []string {
 	return found
 }
 
-func scan() string {
+func dataExists() bool {
 	home, _ := os.UserHomeDir()
+	_, err := os.Stat(filepath.Join(home, ".dsh"))
+	return err == nil
+}
+
+func scan() string {
 	s := state{
-		App:      len(installedDirs()) > 0,
-		Dsh:      has("dsh"),
-		Bridge:   bridgeInstalled(),
+		// one checkbox covers the whole DeepSeek stack
+		App:      len(installedDirs()) > 0 || has("dsh") || bridgeInstalled() || dataExists(),
 		Opencode: has("opencode"),
 		Node:     has("node"),
-		Data:     false,
-	}
-	if _, err := os.Stat(filepath.Join(home, ".dsh")); err == nil {
-		s.Data = true
 	}
 	b, _ := json.Marshal(s)
 	return string(b)
@@ -234,24 +231,26 @@ func uninstallAll(selJSON string) {
 	var sel state
 	_ = json.Unmarshal([]byte(selJSON), &sel)
 
-	if sel.Bridge {
-		emit(`window.step('bridge','run')`)
-		if !has("dsh") {
-			emit(`window.step('bridge','ok')`)
-		} else if _, err := runHidden("cmd.exe", "/c", "dsh", "plugin", "--profile", "web", "remove", "dsh-opencode-bridge"); err != nil {
-			emit(`window.step('bridge','fail',` + jsonStr(err.Error()) + `)`)
+	// one checkbox removes the whole DeepSeek stack: app, dsh, bridge and data
+	if sel.App {
+		emit(`window.step('app','run')`)
+		_ = exec.Command("taskkill", "/IM", exeName, "/F").Run()
+
+		if has("dsh") {
+			_, _ = runHidden("cmd.exe", "/c", "dsh", "plugin", "--profile", "web", "remove", "dsh-opencode-bridge")
+			_ = npmUninstall("@deepseek-ai/dsh")
+		}
+		if home, err := os.UserHomeDir(); err == nil {
+			_ = os.RemoveAll(filepath.Join(home, ".dsh"))
+		}
+		if err := removeApp(); err != nil {
+			emit(`window.step('app','fail',` + jsonStr(err.Error()) + `)`)
 		} else {
-			emit(`window.step('bridge','ok')`)
+			emit(`window.step('app','ok')`)
 		}
 	}
-	if sel.Dsh {
-		emit(`window.step('dsh','run')`)
-		if err := npmUninstall("@deepseek-ai/dsh"); err != nil {
-			emit(`window.step('dsh','fail',` + jsonStr(err.Error()) + `)`)
-		} else {
-			emit(`window.step('dsh','ok')`)
-		}
-	}
+
+	// Node and OpenCode are shared with other projects: opt-in only
 	if sel.Opencode {
 		emit(`window.step('opencode','run')`)
 		if err := npmUninstall("@opencode/cli"); err != nil {
@@ -266,23 +265,6 @@ func uninstallAll(selJSON string) {
 			emit(`window.step('node','fail',` + jsonStr(err.Error()) + `)`)
 		} else {
 			emit(`window.step('node','ok')`)
-		}
-	}
-	if sel.Data {
-		emit(`window.step('data','run')`)
-		home, _ := os.UserHomeDir()
-		if err := os.RemoveAll(filepath.Join(home, ".dsh")); err != nil {
-			emit(`window.step('data','fail',` + jsonStr(err.Error()) + `)`)
-		} else {
-			emit(`window.step('data','ok')`)
-		}
-	}
-	if sel.App {
-		emit(`window.step('app','run')`)
-		if err := removeApp(); err != nil {
-			emit(`window.step('app','fail',` + jsonStr(err.Error()) + `)`)
-		} else {
-			emit(`window.step('app','ok')`)
 		}
 	}
 

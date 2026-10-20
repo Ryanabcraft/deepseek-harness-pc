@@ -109,11 +109,8 @@
     <div class="sub" id="t-sub"></div>
     <div style="height:18px"></div>
     <label class="opt" id="o-app"><input type="checkbox" data-id="app" checked><div class="txt"><div class="name" id="n-app"></div><div class="hint" id="h-app"></div></div></label>
-    <label class="opt" id="o-dsh"><input type="checkbox" data-id="dsh" checked><div class="txt"><div class="name" id="n-dsh"></div><div class="hint" id="h-dsh"></div></div></label>
-    <label class="opt" id="o-bridge"><input type="checkbox" data-id="bridge" checked><div class="txt"><div class="name" id="n-bridge"></div><div class="hint" id="h-bridge"></div></div></label>
-    <label class="opt" id="o-opencode"><input type="checkbox" data-id="opencode" checked><div class="txt"><div class="name" id="n-opencode"></div><div class="hint" id="h-opencode"></div></div></label>
+    <label class="opt" id="o-opencode"><input type="checkbox" data-id="opencode"><div class="txt"><div class="name" id="n-opencode"></div><div class="hint" id="h-opencode"></div></div></label>
     <label class="opt" id="o-node"><input type="checkbox" data-id="node"><div class="txt"><div class="name" id="n-node"></div><div class="hint" id="h-node"></div></div></label>
-    <label class="opt" id="o-data"><input type="checkbox" data-id="data"><div class="txt"><div class="name" id="n-data"></div><div class="hint" id="h-data"></div></div></label>
     <button class="btn" id="b-run" onclick="run()"></button>
     <button class="btn ghost" onclick="window.quitApp()" id="b-cancel"></button>
   </div>
@@ -125,11 +122,8 @@
     <div class="sub" id="st-run"></div>
     <div style="height:18px"></div>
     <div class="row" id="p-app"><div class="dot"></div><div class="label" id="pl-app"></div><div class="hint" id="ph-app"></div></div>
-    <div class="row" id="p-dsh"><div class="dot"></div><div class="label" id="pl-dsh"></div><div class="hint" id="ph-dsh"></div></div>
-    <div class="row" id="p-bridge"><div class="dot"></div><div class="label" id="pl-bridge"></div><div class="hint" id="ph-bridge"></div></div>
     <div class="row" id="p-opencode"><div class="dot"></div><div class="label" id="pl-opencode"></div><div class="hint" id="ph-opencode"></div></div>
     <div class="row" id="p-node"><div class="dot"></div><div class="label" id="pl-node"></div><div class="hint" id="ph-node"></div></div>
-    <div class="row" id="p-data"><div class="dot"></div><div class="label" id="pl-data"></div><div class="hint" id="ph-data"></div></div>
     <div class="bar"><i id="bar"></i></div>
     <div class="status" id="st-progress"></div>
   </div>
@@ -149,12 +143,9 @@ const T = {
   en: {
     title: "What do you want to remove?",
     sub: "Only checked items are uninstalled. Nothing runs in the background.",
-    app: "DeepSeek Harness (app)", appHint: "Program Files folder and Desktop shortcuts",
-    dsh: "DeepSeek Harness CLI (dsh)", dshHint: "global npm package @deepseek-ai/dsh",
-    bridge: "OpenCode bridge", bridgeHint: "DSH plugin dsh-opencode-bridge (free models provider)",
-    opencode: "OpenCode CLI", opencodeHint: "global npm package @opencode/cli",
-    node: "Node.js", nodeHint: "shared runtime — other projects may depend on it",
-    data: "DSH data (~/.dsh)", dataHint: "sessions, settings and credentials — cannot be undone",
+    app: "DeepSeek Harness", appHint: "app, dsh, OpenCode bridge and DSH data (~/.dsh) — cannot be undone",
+    opencode: "OpenCode CLI (optional)", opencodeHint: "global npm package @opencode/cli — shared with other tools",
+    node: "Node.js (optional)", nodeHint: "shared runtime — other projects may depend on it",
     run: "Uninstall selected", cancel: "Cancel",
     running: "Removing…", done: "Removed", doneSub: "The selected items were uninstalled.",
     close: "Close", missing: "not installed", removed: "removed", failed: "failed",
@@ -163,12 +154,9 @@ const T = {
   pt: {
     title: "O que você quer remover?",
     sub: "Só o que estiver marcado será desinstalado. Nada roda em segundo plano.",
-    app: "DeepSeek Harness (app)", appHint: "pasta em Program Files e atalhos do Desktop",
-    dsh: "DeepSeek Harness CLI (dsh)", dshHint: "pacote global do npm @deepseek-ai/dsh",
-    bridge: "Ponte OpenCode", bridgeHint: "plugin dsh-opencode-bridge no perfil web (provider dos modelos free)",
-    opencode: "OpenCode CLI", opencodeHint: "pacote global do npm @opencode/cli",
-    node: "Node.js", nodeHint: "runtime compartilhado — outros projetos podem depender dele",
-    data: "Dados do DSH (~/.dsh)", dataHint: "sessões, configurações e credenciais — não dá pra desfazer",
+    app: "DeepSeek Harness", appHint: "app, dsh, ponte OpenCode e dados do DSH (~/.dsh) — não dá pra desfazer",
+    opencode: "OpenCode CLI (opcional)", opencodeHint: "pacote global do npm @opencode/cli — compartilhado com outras ferramentas",
+    node: "Node.js (opcional)", nodeHint: "runtime compartilhado — outros projetos podem depender dele",
     run: "Desinstalar selecionados", cancel: "Cancelar",
     running: "Removendo…", done: "Removido", doneSub: "Os itens selecionados foram desinstalados.",
     close: "Fechar", missing: "não instalado", removed: "removido", failed: "falhou",
@@ -200,7 +188,7 @@ async function pick(l) {
   $('st-done').textContent = t.doneSub;
   $('b-close').textContent = t.close;
 
-  for (const id of ['app', 'dsh', 'bridge', 'opencode', 'node', 'data']) {
+  for (const id of ['app', 'opencode', 'node']) {
     $('n-' + id).textContent = t[id];
     $('h-' + id).textContent = t[id + 'Hint'];
     $('pl-' + id).textContent = t[id];
@@ -212,21 +200,21 @@ async function pick(l) {
       box.disabled = true;
       $('h-' + id).textContent = t.missing;
     } else {
-      box.checked = (id !== 'node' && id !== 'data');
+      box.checked = id !== 'node';
     }
   }
   show('s-main');
 }
 
 function run() {
-  const sel = { app: false, dsh: false, bridge: false, opencode: false, node: false, data: false };
+  const sel = { app: false, opencode: false, node: false };
   document.querySelectorAll('input[data-id]').forEach(b => { sel[b.dataset.id] = b.checked && !b.disabled; });
   $('b-run').disabled = true;
   show('s-run');
   window.uninstall(JSON.stringify(sel));
 }
 
-const order = ['app', 'bridge', 'dsh', 'opencode', 'node', 'data'];
+const order = ['app', 'opencode', 'node'];
 let finished = 0;
 
 window.step = function (id, st, detail) {
